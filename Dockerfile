@@ -1,8 +1,11 @@
 FROM alpine:latest AS build
 RUN apk add --no-cache \
   build-base \
+  clang \
   cmake \
+  compiler-rt \
   curl \
+  lld \
   perl \
   pkgconfig
 RUN mkdir /putty \
