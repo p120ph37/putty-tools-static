@@ -7,13 +7,15 @@ RUN apk add --no-cache \
   curl \
   lld \
   perl \
-  pkgconfig
+  pkgconfig \
+  upx
 RUN mkdir /putty \
  && curl -s -L https://the.earth.li/~sgtatham/putty/latest/putty-0.82.tar.gz \
   | tar -xzvC/putty --strip-components=1
 RUN cd /putty \
  && cmake -DCMAKE_EXE_LINKER_FLAGS='-static -s' . \
- && cmake --build .
+ && cmake --build . \
+ && upx --best pageant plink pscp psftp psusan puttygen
 RUN mkdir /putty-tools-static \
  && cp \
     /putty/pageant \
