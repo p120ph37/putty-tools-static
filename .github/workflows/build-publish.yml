@@ -1,0 +1,62 @@
+name: Build and Publish
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    env:
+      DOCKER_REPO: ameriwether/putty-tools-static
+      DOCKER_BUILD_OPTS: --cache-from=type=gha --cache-to=type=gha,mode=max --platform=linux/amd64,linux/arm64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: crazy-max/ghaction-github-runtime@v3
+      - uses: actions/checkout@v4
+      - name: docker build
+        run: docker buildx build ${DOCKER_BUILD_OPTS} .
+      - name: export binaries
+        run: |
+          mkdir ./files
+          docker buildx build ${DOCKER_BUILD_OPTS} \
+            --output=type=local,dest=./files \
+            .
+          for arch in ./files/*; do
+            tar -czvf ./putty-tools-${arch##*_}.tgz -C $arch .
+          done
+      - name: set version
+        run: |
+          if [[ $GITHUB_REF_TYPE = tag ]]; then
+            echo "PUBLISH_VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else
+            echo "PUBLISH_VERSION=snapshot" >> $GITHUB_ENV
+          fi
+      - name: publish on github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ $PUBLISH_VERSION = snapshot ]]; then
+            gh release delete snapshot --yes --cleanup-tag || true
+            gh release create snapshot --prerelease \
+              --title=snapshot --generate-notes ./putty-tools-*.tgz
+          else
+            gh release delete ${GITHUB_REF_NAME} --yes || true
+            gh release create ${GITHUB_REF_NAME} --verify-tag \
+               --title=${PUBLISH_VERSION} --generate-notes ./putty-tools-*.tgz
+          fi
+      - name: publish on dockerhub
+        run: |
+          docker buildx build ${DOCKER_BUILD_OPTS} \
+            --tag=${DOCKER_REPO}:latest \
+            --tag=${DOCKER_REPO}:${PUBLISH_VERSION} \
+            --output=type=image,push=true \
+            .

@@ -15,15 +15,8 @@ RUN mkdir /putty \
 RUN cd /putty \
  && cmake -DCMAKE_EXE_LINKER_FLAGS='-static -s' . \
  && cmake --build . \
- && upx --best pageant plink pscp psftp psusan puttygen
-RUN mkdir /putty-tools-static \
- && cp \
-    /putty/pageant \
-    /putty/plink \
-    /putty/pscp \
-    /putty/psftp \
-    /putty/psusan \
-    /putty/puttygen \
-    /putty-tools-static
+ && mkdir /putty-tools-static \
+ && mv pageant plink pscp psftp psusan puttygen -t /putty-tools-static
+RUN upx --lzma /putty-tools-static/*
 FROM scratch
 COPY --from=build /putty-tools-static /
